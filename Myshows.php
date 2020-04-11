@@ -7,13 +7,15 @@ class Myshows
 {
     protected $cookies = [];
     protected $token;
+    protected $login;
 
     public function __construct()
     {
-        if (file_exists('auth.txt')) {
-            $auth = unserialize(file_get_contents('auth.txt'), ['allowed_classes' => ['Myshows']]);
-            $this->cookies = $auth['cookies'];
-            $this->token = $auth['token'];
+        if (file_exists('backup.txt')) {
+            $auth = unserialize(file_get_contents('backup.txt'), ['allowed_classes' => ['Myshows']]);
+            $this->cookies = $auth->cookies;
+            $this->token = $auth->token;
+            $this->login = $auth->login;
         } else {
             $login = 'bmlraXRvaXpvQG1haWwucnU=';
             $password = 'NWI1NGY1NWJiZmFmNjEwMmE2M2UyY2VlZmM5MjlkN2E=';
@@ -111,10 +113,10 @@ class Myshows
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
         curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        //curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        //curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $requestData);
-        curl_setopt($ch, CURLOPT_PROXY, "localhost:55116");
+        //curl_setopt($ch, CURLOPT_PROXY, "localhost:55116");
         if ($customUrl || $action === 'LoginSiteUser') {
             curl_setopt($ch, CURLOPT_HEADER, 1);
         }
@@ -181,13 +183,23 @@ class Myshows
             return false;
         }
         $cookies = $matches[1];
+        foreach ($this->getCookies() as $cookie) {
+            if (strpos($cookie, 'login')) {
+                $login = explode('=', $cookie)[1];
+                $this->setLogin($login);
+                break;
+            }
+        }
         $this->setCookies($cookies);
         return true;
     }
 
+    /** Сериализируем класс после каждого изменения
+     *
+     */
     public function serializeClass()
     {
-        file_put_contents('auth.txt', serialize($this));
+        file_put_contents('backup.txt', serialize($this));
     }
 
     /** Отметить эпизод из файла
@@ -252,7 +264,7 @@ class Myshows
                 'rating' => 5,
             ];
             $this->apiRequest('RateEpisode', $requestData);
-            if (!$this->validateRated()) {
+            if (!$this->validateRated($episode)) {
                 throw new Exception('запрос ушел, а эпизод не отмечен :(');
             }
             return true;
@@ -262,14 +274,40 @@ class Myshows
         }
     }
 
-    /** Валидируем удалось ли отметить серию (если не задан $episode, то проверяем отмеченные "за сегодня")
+    /** Валидируем удалось ли отметить серию
+     * @param string $episode
      * @return bool
+     * @throws Exception
      */
     public function validateRated($episode = null)
     {
-        if (!$episode) {
+        if (!$this->getLogin()) {
+            $this->getAuthorizationData();
+        }
 
+        $html = $this->apiRequest('', null, 'https://myshows.me/' . $this->getLogin());
+        if ($episode) {
+            if (!strpos($html, "https://myshows.me/view/episode/$episode")) {
+                if (!strpos($html, '<b>Сегодня</b>')) {
+                    throw new Exception('Не удалось найти эпизод: обнаружены просмотры за сегодня');
+                }
+            }
+        } else {
+            if (!strpos($html, '<b>Сегодня</b>')) {
+                throw new Exception('Не обнаружены просмотры за сегодня');
+            }
         }
         return true;
+    }
+
+    public function getLogin()
+    {
+        return $this->token;
+    }
+
+    public function setLogin(string $login): string
+    {
+        $this->login = $login;
+        return $this->login;
     }
 }

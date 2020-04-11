@@ -1,5 +1,6 @@
 /.idea/.gitignore
 /auth.txt
+/backup.txt.txt
 /vendor/autoload.php
 /vendor/composer/autoload_classmap.php
 /vendor/composer/autoload_namespaces.php
