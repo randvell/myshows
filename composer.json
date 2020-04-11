@@ -1,0 +1,16 @@
+{
+  "name": "zimin/myshows_bot",
+  "description": "Mark you series everyday",
+  "minimum-stability": "stable",
+  "license": "proprietary",
+  "authors": [
+    {
+      "name": "Nikita Zimin",
+      "email": "nikitoizo@gmail.com"
+    }
+  ],
+  "require": {
+    "ext-curl": "*",
+    "ext-json": "*"
+  }
+}
