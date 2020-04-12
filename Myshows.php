@@ -27,7 +27,7 @@ class Myshows
     public function log($message)
     {
         echo $message . "\n";
-        file_put_contents('log.txt', date('d M Y H:i:s') . $message . "\n", FILE_APPEND);
+        file_put_contents('log.txt', date('d M Y H:i:s ') . $message . "\n", FILE_APPEND);
     }
 
     /** Авторизация
@@ -251,11 +251,11 @@ class Myshows
             if (!$episode) {
                 throw new Exception('Не удалось получить ID эпизода (закончились серии или некорректный файл)');
             }
-            if ($this->rateEpisode($episode)) {
-                unset($episodes[0]);
-                file_put_contents('episodes.txt', implode('', $episodes));
-                $this->log('Эпизод ' . $episode . ' успешно отмечен');
-            }
+            $this->rateEpisode($episode);
+            unset($episodes[0]);
+            file_put_contents('episodes.txt', implode('', $episodes));
+            $this->log('Эпизод ' . $episode . ' успешно отмечен');
+            exit();
         } catch (Throwable $e) {
             $this->log('Не удалось отметить серию из заданного фалйа: ' . $e->getMessage());
         }
@@ -304,10 +304,10 @@ class Myshows
                 'rating' => 5,
             ];
             $this->apiRequest('RateEpisode', $requestData);
+            sleep(10);
             if (!$this->validateRated($episode, $retry)) {
                 throw new Exception('запрос ушел, а эпизод не отмечен :(');
             }
-            $this->log('Эпизод успешно отмечен');
             return true;
         } catch (Exception $e) {
             $this->log('Не удалось отметить эпизод: ' . $e->getMessage());
@@ -332,10 +332,24 @@ class Myshows
 
         try {
             $html = $this->apiRequest('', null, 'https://myshows.me/' . $this->getLogin());
+
+            $seriesToday = false;
+            $dom = new DOMDocument('', 'UTF-8');
+            $dom->strictErrorChecking = false;
+            @$dom->loadHTML(explode("\r\n\r\n", $html)[1]);
+            $xpath = new DomXPath($dom);
+            $nodes = $xpath->query('/html/body/div[1]/div/div/main/div');
+            foreach ($nodes as $node) {
+                if (strpos($node->nodeValue, 'Сегодня') && strpos($node->nodeValue, 'серию сериала')) {
+                    $seriesToday = true;
+                    break;
+                }
+            }
+
             if ($episode) {
                 if (!strpos($html, "https://myshows.me/view/episode/$episode")) {
                     $this->log('Не удалось найти информацию о заданном эпизоде');
-                    if (!strpos($html, '<b>Сегодня</b>')) {
+                    if (!$seriesToday) {
                         $this->log('Просмотры за сегодня также отсутсвуют');
                         if (!$retry) {
                             $this->rateEpisode(null, true);
@@ -344,7 +358,7 @@ class Myshows
                     }
                 }
             } else {
-                if (!strpos($html, '<b>Сегодня</b>')) {
+                if (!$seriesToday) {
                     $this->log('Просмотры за сегодня отсутсвуют, пытаюсь отметить серию');
                     $this->rateEpisode(null, true);
                 }

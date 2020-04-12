@@ -11,6 +11,7 @@
   ],
   "require": {
     "ext-curl": "*",
-    "ext-json": "*"
+    "ext-json": "*",
+    "ext-dom": "*"
   }
 }
