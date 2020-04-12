@@ -169,7 +169,7 @@ class Myshows
         }
         curl_close($ch);
         if ($customUrl || $action === 'LoginSiteUser') {
-            if ($action != 'LoginSiteUser') {
+            if ($action !== 'LoginSiteUser') {
                 $response = json_decode($result, true);
             } else {
                 $response = json_encode(explode("\r\n\r\n", $result)[1]);
@@ -244,7 +244,7 @@ class Myshows
         try {
             if (!file_exists($filePath)) {
                 $this->log('Файл не найден, создаю новый');
-                $this->setEpisodeListFromUrl();
+                $this->setEpisodeListFromUrl('https://myshows.me/view/231/');
             }
             $episodes = file($filePath);
             $episode = trim($episodes[0]);
@@ -255,7 +255,7 @@ class Myshows
             unset($episodes[0]);
             file_put_contents('episodes.txt', implode('', $episodes));
             $this->log('Эпизод ' . $episode . ' успешно отмечен');
-            exit();
+            //exit();
         } catch (Throwable $e) {
             $this->log('Не удалось отметить серию из заданного фалйа: ' . $e->getMessage());
         }
@@ -277,6 +277,7 @@ class Myshows
                 return false;
             }
             array_unique($matches[2]);
+            sort($matches[2]);
             $episodes = implode("\n", $matches[2]);
             file_put_contents('episodes.txt', $episodes);
             return true;
@@ -298,6 +299,7 @@ class Myshows
             if (!$episode) {
                 $this->log('Не передан id эпизода, беру из файла');
                 $this->rateEpisodeFromFile();
+                return true;
             }
             $requestData['params'] = [
                 'episodeId' => (int)$episode,
@@ -361,9 +363,10 @@ class Myshows
                 if (!$seriesToday) {
                     $this->log('Просмотры за сегодня отсутсвуют, пытаюсь отметить серию');
                     $this->rateEpisode(null, true);
+                } else {
+                    $this->log('Отметка за сегодня найдена');
                 }
             }
-            $this->log('Отметка об эпизоде найдена');
             return true;
         } catch (Throwable $e) {
             $this->log('Не удалось валидировать просмотры за сегодня: ' . $e->getMessage());
