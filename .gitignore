@@ -1,6 +1,5 @@
 /.idea/.gitignore
 /auth.txt
-/backup.txt.txt
 /vendor/autoload.php
 /vendor/composer/autoload_classmap.php
 /vendor/composer/autoload_namespaces.php
@@ -21,3 +20,5 @@
 /.idea/dictionaries/Randvell.xml
 /test.php
 /.idea/vcs.xml
+/backup.txt
+/log.txt

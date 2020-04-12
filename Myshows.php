@@ -1,7 +1,9 @@
 <?php
 
 $myshows = new Myshows();
-$myshows->rateEpisodeFromFile();
+if (!$myshows->validateRated()) {
+    $myshows->rateEpisode();
+}
 
 class Myshows
 {
@@ -11,16 +13,21 @@ class Myshows
 
     public function __construct()
     {
+        $this->log('Инициализация класса');
         if (file_exists('backup.txt')) {
             $auth = unserialize(file_get_contents('backup.txt'), ['allowed_classes' => ['Myshows']]);
             $this->cookies = $auth->cookies;
             $this->token = $auth->token;
             $this->login = $auth->login;
         } else {
-            $login = 'bmlraXRvaXpvQG1haWwucnU=';
-            $password = 'NWI1NGY1NWJiZmFmNjEwMmE2M2UyY2VlZmM5MjlkN2E=';
-            $this->authorize($login, $password);
+            $this->authorize();
         }
+    }
+
+    public function log($message)
+    {
+        echo $message . "\n";
+        file_put_contents('log.txt', date('d M Y H:i:s') . $message . "\n", FILE_APPEND);
     }
 
     /** Авторизация
@@ -28,8 +35,14 @@ class Myshows
      * @param string $password
      * @return bool|string
      */
-    public function authorize($login, $password)
+    public function authorize($login = null, $password = null)
     {
+        $this->log('Производится авторизация');
+        if (!$login && !$password) {
+            $authData = $this->getAuthData();
+            $login = $authData['login'];
+            $password = $authData['password'];
+        }
         $login = base64_decode($login);
         $password = base64_decode($password);
         try {
@@ -42,9 +55,18 @@ class Myshows
             $this->setCookiesFromHtml($result);
             return true;
         } catch (Throwable $e) {
-            echo $e->getMessage();
-            return false;
+            $this->log('Не удалось авторизоваться: ' . $e->getMessage());
+            exit();
         }
+    }
+
+    /** Получаем данные для авторизации из файла
+     * @return array
+     */
+    public function getAuthData()
+    {
+        $data = explode("\r\n", file_get_contents('auth.txt'));
+        return ['login' => $data[0], 'password' => $data[1]];
     }
 
     /** Получение первычных данных для авторизации
@@ -52,18 +74,20 @@ class Myshows
      */
     public function getAuthorizationData()
     {
+        $this->log('Запрашиваю данные для авторизации');
         if ($this->getToken() && $this->getCookies()) {
+            $this->log('Данные для авторизации имеются в конфиге');
             return true;
         }
         try {
-            $html = $this->apiRequest('', null, 'https://myshows.me');
+            $html = $this->apiRequest('', null, 'https://myshows.me/');
             if (!$this->setTokenFromHtml($html) || !$this->setCookiesFromHtml($html)) {
                 throw new Exception('Не удалось получить данные для авторизации');
             }
             $this->serializeClass();
             return true;
         } catch (Throwable $e) {
-            echo $e->getMessage();
+            $this->log($e->getMessage());
             return false;
         }
     }
@@ -136,18 +160,24 @@ class Myshows
         }
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
+        $this->log('Выполняю запрос к ' . $url . ($action ? (' action: ' . $action) : '') .
+            ($params ? (' params: ' . json_encode($params)) : ''));
         $result = curl_exec($ch);
         if (curl_errno($ch)) {
             throw new Exception('Не удалось выполнить запрос: ' . curl_error($ch));
         }
         curl_close($ch);
         if ($customUrl || $action === 'LoginSiteUser') {
-            $response = json_decode($result);
+            if ($action != 'LoginSiteUser') {
+                $response = json_decode($result, true);
+            } else {
+                $response = json_encode(explode("\r\n\r\n", $result)[1]);
+            }
             if (isset($response['error'])) {
-                if ($response['data'] === 'Invalid Token') {
+                if ($response['error']['data'] === 'Invalid Token') {
                     $this->token = null;
                     $this->cookies = [];
-                    $this->getAuthorizationData();
+                    $this->authorize();
                     $this->apiRequest($action, $params, $customUrl);
                 }
                 throw new Exception('Ошибки запроса: ' . json_encode($response['error']));
@@ -162,6 +192,7 @@ class Myshows
      */
     public function setTokenFromHtml($html): bool
     {
+        $this->log('Получаю токен из HTML страницы');
         $regex = '/(var __token = \')(.*)(\';)/m';
         preg_match($regex, $html, $matches);
         $token = $matches[2];
@@ -178,12 +209,13 @@ class Myshows
      */
     public function setCookiesFromHtml($html): bool
     {
+        $this->log('Получаю кукис и логин из HTML страницы');
         preg_match_all('/^Set-Cookie:\s*([^;]*)/mi', $html, $matches);
         if (!$matches) {
             return false;
         }
         $cookies = $matches[1];
-        foreach ($this->getCookies() as $cookie) {
+        foreach ($cookies as $cookie) {
             if (strpos($cookie, 'login')) {
                 $login = explode('=', $cookie)[1];
                 $this->setLogin($login);
@@ -207,8 +239,10 @@ class Myshows
      */
     public function rateEpisodeFromFile($filePath = 'episodes.txt')
     {
+        $this->log('Отмечаю эпизод из файла');
         try {
             if (!file_exists($filePath)) {
+                $this->log('Файл не найден, создаю новый');
                 $this->setEpisodeListFromUrl();
             }
             $episodes = file($filePath);
@@ -219,9 +253,10 @@ class Myshows
             if ($this->rateEpisode($episode)) {
                 unset($episodes[0]);
                 file_put_contents('episodes.txt', implode('', $episodes));
+                $this->log('Эпизод ' . $episode . ' успешно отмечен');
             }
         } catch (Throwable $e) {
-            echo 'Не удалось отметить серию из заданного фалйа: ' . $e->getMessage();
+            $this->log('Не удалось отметить серию из заданного фалйа: ' . $e->getMessage());
         }
     }
 
@@ -233,6 +268,7 @@ class Myshows
     public function setEpisodeListFromUrl($url = 'https://myshows.me/profile/')
     {
         try {
+            $this->log('Сохраняю список эпизодов по ссылке ' . $url);
             $html = $this->apiRequest('', null, $url);
             $regex = '/(href="https:\/\/myshows.me\/view\/episode\/)(.*)(\/")/';
             preg_match_all($regex, $html, $matches);
@@ -244,7 +280,7 @@ class Myshows
             file_put_contents('episodes.txt', $episodes);
             return true;
         } catch (Throwable $e) {
-            echo 'Не удалось сохранить список серий: ' . $e->getMessage();
+            $this->log('Не удалось сохранить список серий: ' . $e->getMessage());
             return false;
         }
     }
@@ -255,8 +291,10 @@ class Myshows
      */
     public function rateEpisode($episode = null)
     {
+        $this->log('Приступаю к отметке эпизода');
         try {
             if (!$episode) {
+                $this->log('Не передан id эпизода, беру из файла');
                 $this->rateEpisodeFromFile();
             }
             $requestData['params'] = [
@@ -267,9 +305,10 @@ class Myshows
             if (!$this->validateRated($episode)) {
                 throw new Exception('запрос ушел, а эпизод не отмечен :(');
             }
+            $this->log('Эпизод успешно отмечен');
             return true;
         } catch (Exception $e) {
-            echo('Не удалось отметить эпизод: ' . $e->getMessage());
+            $this->log('Не удалось отметить эпизод: ' . $e->getMessage());
             return false;
         }
     }
@@ -279,33 +318,49 @@ class Myshows
      * @return bool
      * @throws Exception
      */
-    public function validateRated($episode = null)
+    public function validateRated($episode = null, $retry = false)
     {
+        $this->log('Проверяю отметку о просмотре ' . ($episode ?? 'за сегодня'));
         if (!$this->getLogin()) {
-            $this->getAuthorizationData();
+            $this->log('Логин не задан, авторизируюсь заново');
+            $this->cookies = [];
+            $this->token = '';
+            $this->authorize();
         }
 
-        $html = $this->apiRequest('', null, 'https://myshows.me/' . $this->getLogin());
-        if ($episode) {
-            if (!strpos($html, "https://myshows.me/view/episode/$episode")) {
+        try {
+            $html = $this->apiRequest('', null, 'https://myshows.me/' . $this->getLogin());
+            if ($episode) {
+                if (!strpos($html, "https://myshows.me/view/episode/$episode")) {
+                    $this->log('Не удалось найти информацию о заданном эпизоде');
+                    if (!strpos($html, '<b>Сегодня</b>')) {
+                        $this->log('Просмотры за сегодня также отсутсвуют');
+                        if (!$retry) {
+                            $this->rateEpisode(null, true);
+                        }
+                        throw new Exception('Повторная попытка отметить эпизод увенчалась провалом');
+                    }
+                }
+            } else {
                 if (!strpos($html, '<b>Сегодня</b>')) {
-                    throw new Exception('Не удалось найти эпизод: обнаружены просмотры за сегодня');
+                    $this->log('Просмотры за сегодня отсутсвуют, пытаюсь отметить серию');
+                    $this->rateEpisode(null, true);
                 }
             }
-        } else {
-            if (!strpos($html, '<b>Сегодня</b>')) {
-                throw new Exception('Не обнаружены просмотры за сегодня');
-            }
+            $this->log('Отметка об эпизоде найдена');
+            return true;
+        } catch (Throwable $e) {
+            $this->log('Не удалось валидировать просмотры за сегодня: ' . $e->getMessage());
+            return false;
         }
-        return true;
     }
 
     public function getLogin()
     {
-        return $this->token;
+        return $this->login;
     }
 
-    public function setLogin(string $login): string
+    public function setLogin($login): string
     {
         $this->login = $login;
         return $this->login;
