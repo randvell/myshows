@@ -84,7 +84,6 @@ class Myshows
             if (!$this->setTokenFromHtml($html) || !$this->setCookiesFromHtml($html)) {
                 throw new Exception('Не удалось получить данные для авторизации');
             }
-            $this->serializeClass();
             return true;
         } catch (Throwable $e) {
             $this->log($e->getMessage());
@@ -100,6 +99,7 @@ class Myshows
     public function setToken(string $token)
     {
         $this->token = $token;
+        $this->serializeClass();
         return $this->token;
     }
 
@@ -111,6 +111,7 @@ class Myshows
     public function setCookies(array $cookies)
     {
         $this->cookies = array_merge($cookies, $this->getCookies());
+        $this->serializeClass();
         return $this->cookies;
     }
 
@@ -287,9 +288,10 @@ class Myshows
 
     /** Отмечаем эпизод просмотренным
      * @param null|string $episode
+     * @param bool $retry
      * @return bool
      */
-    public function rateEpisode($episode = null)
+    public function rateEpisode($episode = null, $retry = false)
     {
         $this->log('Приступаю к отметке эпизода');
         try {
@@ -302,7 +304,7 @@ class Myshows
                 'rating' => 5,
             ];
             $this->apiRequest('RateEpisode', $requestData);
-            if (!$this->validateRated($episode)) {
+            if (!$this->validateRated($episode, $retry)) {
                 throw new Exception('запрос ушел, а эпизод не отмечен :(');
             }
             $this->log('Эпизод успешно отмечен');
@@ -315,8 +317,8 @@ class Myshows
 
     /** Валидируем удалось ли отметить серию
      * @param string $episode
+     * @param bool $retry
      * @return bool
-     * @throws Exception
      */
     public function validateRated($episode = null, $retry = false)
     {
@@ -363,6 +365,7 @@ class Myshows
     public function setLogin($login): string
     {
         $this->login = $login;
+        $this->serializeClass();
         return $this->login;
     }
 }
