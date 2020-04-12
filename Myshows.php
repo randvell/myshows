@@ -1,5 +1,6 @@
 <?php
 
+// Скрипт для ежедневного отмечания серий на Myshows
 $myshows = new Myshows();
 if (!$myshows->validateRated()) {
     $myshows->rateEpisode();
