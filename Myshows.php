@@ -24,10 +24,40 @@ class Myshows
         }
     }
 
-    public function log($message)
+    public function getLogin()
     {
-        echo $message . "\n";
-        file_put_contents('log.txt', date('d M Y H:i:s ') . $message . "\n", FILE_APPEND);
+        return $this->login;
+    }
+
+    public function setLogin($login): string
+    {
+        $this->login = $login;
+        $this->serializeClass();
+        return $this->login;
+    }
+
+    public function getToken()
+    {
+        return $this->token;
+    }
+
+    public function setToken(string $token)
+    {
+        $this->token = $token;
+        $this->serializeClass();
+        return $this->token;
+    }
+
+    public function getCookies()
+    {
+        return $this->cookies;
+    }
+
+    public function setCookies(array $cookies)
+    {
+        $this->cookies = array_merge($cookies, $this->getCookies());
+        $this->serializeClass();
+        return $this->cookies;
     }
 
     /** Авторизация
@@ -46,7 +76,7 @@ class Myshows
         $login = base64_decode($login);
         $password = base64_decode($password);
         try {
-            $this->getAuthorizationData();
+            $this->setAuthorizationData();
             $requestData['params'] = [
                 'login' => $login,
                 'password' => $password,
@@ -72,7 +102,7 @@ class Myshows
     /** Получение первычных данных для авторизации
      * @return array|bool
      */
-    public function getAuthorizationData()
+    public function setAuthorizationData()
     {
         $this->log('Запрашиваю данные для авторизации');
         if ($this->getToken() && $this->getCookies()) {
@@ -91,28 +121,13 @@ class Myshows
         }
     }
 
-    public function getToken()
+    /** Логгирование всего и вся
+     * @param $message
+     */
+    public function log($message)
     {
-        return $this->token;
-    }
-
-    public function setToken(string $token)
-    {
-        $this->token = $token;
-        $this->serializeClass();
-        return $this->token;
-    }
-
-    public function getCookies()
-    {
-        return $this->cookies;
-    }
-
-    public function setCookies(array $cookies)
-    {
-        $this->cookies = array_merge($cookies, $this->getCookies());
-        $this->serializeClass();
-        return $this->cookies;
+        echo $message . "\n";
+        file_put_contents('log.txt', date('d M Y H:i:s ') . $message . "\n", FILE_APPEND);
     }
 
     /** Запрос к Api
@@ -372,17 +387,5 @@ class Myshows
             $this->log('Не удалось валидировать просмотры за сегодня: ' . $e->getMessage());
             return false;
         }
-    }
-
-    public function getLogin()
-    {
-        return $this->login;
-    }
-
-    public function setLogin($login): string
-    {
-        $this->login = $login;
-        $this->serializeClass();
-        return $this->login;
     }
 }
