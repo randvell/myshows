@@ -127,7 +127,7 @@ class Myshows
      */
     public function log($message)
     {
-        echo $message . "\n";
+        echo $message . '<br>';
         file_put_contents('log.txt', date('d M Y H:i:s ') . $message . "\n", FILE_APPEND);
     }
 
@@ -178,7 +178,7 @@ class Myshows
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
         $this->log('Выполняю запрос к ' . $url . ($action ? (' action: ' . $action) : '') .
-            ($params ? (' params: ' . json_encode($params)) : ''));
+            (($params && ($action !== 'LoginSiteUser')) ? (' params: ' . json_encode($params)) : ''));
         $result = curl_exec($ch);
         if (curl_errno($ch)) {
             throw new Exception('Не удалось выполнить запрос: ' . curl_error($ch));

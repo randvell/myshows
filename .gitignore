@@ -9,7 +9,6 @@
 /vendor/composer/ClassLoader.php
 /composer.lock
 /episodes.txt
-/index.php
 /vendor/composer/installed.json
 /vendor/composer/LICENSE
 /.idea/magicento.xml
