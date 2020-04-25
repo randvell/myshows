@@ -249,6 +249,7 @@ class Myshows
     public function serializeClass()
     {
         file_put_contents('backup.txt', serialize($this));
+        $this->log('Бэкап данных успешно сохранен');
     }
 
     /** Отметить эпизод из файла
