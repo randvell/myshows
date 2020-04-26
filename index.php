@@ -254,28 +254,24 @@ class Myshows
 
     /** Отметить эпизод из файла
      * @param string $filePath
+     * @return bool|string
+     * @throws Exception
      */
-    public function rateEpisodeFromFile($filePath = 'episodes.txt')
+    public function getEpisodeFromFile($filePath = 'episodes.txt')
     {
         $this->log('Отмечаю эпизод из файла');
-        try {
-            if (!file_exists($filePath)) {
-                $this->log('Файл не найден, создаю новый');
-                $this->setEpisodeListFromUrl('https://myshows.me/view/231/');
-            }
-            $episodes = file($filePath);
-            $episode = trim($episodes[0]);
-            if (!$episode) {
-                throw new Exception('Не удалось получить ID эпизода (закончились серии или некорректный файл)');
-            }
-            $this->rateEpisode($episode);
-            unset($episodes[0]);
-            file_put_contents('episodes.txt', implode('', $episodes));
-            $this->log('Эпизод ' . $episode . ' успешно отмечен');
-            //exit();
-        } catch (Throwable $e) {
-            $this->log('Не удалось отметить серию из заданного фалйа: ' . $e->getMessage());
+        if (!file_exists($filePath)) {
+            $this->log('Файл не найден, создаю новый');
+            $this->setEpisodeListFromUrl('https://myshows.me/view/231/');
         }
+        $episodes = file($filePath);
+        $episode = trim($episodes[0]);
+        if (!$episode) {
+            throw new Exception('Не удалось получить ID эпизода (закончились серии или некорректный файл)');
+        }
+        unset($episodes[0]);
+        file_put_contents('episodes.txt', implode('', $episodes));
+        return $episode;
     }
 
     /** Получаем список серий для отметок и сохраняем в файл
@@ -315,8 +311,10 @@ class Myshows
         try {
             if (!$episode) {
                 $this->log('Не передан id эпизода, беру из файла');
-                $this->rateEpisodeFromFile();
-                return true;
+                $episode = $this->getEpisodeFromFile('episodes.txt');
+                if (!$episode) {
+                    throw new Exception('Не удалось получить эпизод из файла');
+                }
             }
             $requestData['params'] = [
                 'episodeId' => (int)$episode,
@@ -371,7 +369,7 @@ class Myshows
                     if (!$seriesToday) {
                         $this->log('Просмотры за сегодня также отсутсвуют');
                         if (!$retry) {
-                            $this->rateEpisode(null, true);
+                            $this->rateEpisode($episode, true);
                         }
                         throw new Exception('Повторная попытка отметить эпизод увенчалась провалом');
                     }
@@ -379,7 +377,7 @@ class Myshows
             } else {
                 if (!$seriesToday) {
                     $this->log('Просмотры за сегодня отсутсвуют, пытаюсь отметить серию');
-                    $this->rateEpisode(null, true);
+                    $this->rateEpisode($episode, true);
                 } else {
                     $this->log('Отметка за сегодня найдена');
                 }
